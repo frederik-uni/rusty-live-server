@@ -4,7 +4,10 @@ use base64::{prelude::BASE64_STANDARD, Engine as _};
 use sha1::{Digest as _, Sha1};
 use tokio::{
     io::{self, AsyncReadExt as _, AsyncWriteExt as _},
-    net::TcpStream,
+    net::{
+        tcp::{OwnedReadHalf, OwnedWriteHalf},
+        TcpStream,
+    },
     sync::Mutex,
     task::JoinHandle,
 };
@@ -44,7 +47,9 @@ pub enum Opcode {
 }
 
 /// Chatgpt
-pub async fn read_websocket_message(stream: &mut TcpStream) -> Result<WebSocketMessage, io::Error> {
+pub async fn read_websocket_message(
+    stream: &mut OwnedReadHalf,
+) -> Result<WebSocketMessage, io::Error> {
     // Read the first two bytes which contain the frame header
     let mut header = [0; 2];
     stream.read_exact(&mut header).await?;
@@ -93,7 +98,7 @@ pub async fn read_websocket_message(stream: &mut TcpStream) -> Result<WebSocketM
 }
 
 /// Chatgpt
-pub async fn send_websocket_message(stream: &mut TcpStream, message: &str) -> io::Result<()> {
+pub async fn send_websocket_message(stream: &mut OwnedWriteHalf, message: &str) -> io::Result<()> {
     let mut frame = Vec::new();
     frame.push(0x81);
     if message.len() < 126 {
@@ -119,24 +124,6 @@ pub fn generate_websocket_accept_key(key: &str) -> String {
     BASE64_STANDARD.encode(result)
 }
 
-fn spawn_loop(
-    stream: Arc<Mutex<TcpStream>>,
-    closed: Arc<Mutex<bool>>,
-    sender: Arc<Mutex<Option<JoinHandle<()>>>>,
-) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        while let Ok(msg) = read_websocket_message(&mut *stream.lock().await).await {
-            if matches!(msg.opcode, Opcode::Close) {
-                break;
-            }
-        }
-        *closed.lock().await = true;
-        if let Some(v) = sender.lock().await.as_ref() {
-            v.abort();
-        }
-    })
-}
-
 pub async fn handle_websocket(
     mut stream: TcpStream,
     key: String,
@@ -153,35 +140,31 @@ pub async fn handle_websocket(
     stream.write_all(response.as_bytes()).await?;
 
     tokio::spawn(async move {
-        //TODO: refactor
-        let stream = Arc::new(Mutex::new(stream));
-        let closed = Arc::new(Mutex::new(false));
-        let sender = Arc::new(Mutex::new(None));
-        let close = Arc::new(Mutex::new(spawn_loop(
-            stream.clone(),
-            closed.clone(),
-            sender.clone(),
-        )));
-        let sender2 = sender.clone();
-        let v = Some(tokio::spawn(async move {
+        let (mut read_stream, mut write_stream) = stream.into_split();
+        let sender: Arc<Mutex<Option<JoinHandle<_>>>> = Arc::new(Mutex::new(None));
+        let sender_read = sender.clone();
+        let close = Arc::new(Mutex::new(tokio::spawn(async move {
+            while let Ok(msg) = read_websocket_message(&mut read_stream).await {
+                if matches!(msg.opcode, Opcode::Close) {
+                    break;
+                }
+            }
+            if let Some(v) = sender_read.lock().await.as_ref() {
+                v.abort();
+            }
+        })));
+        *sender.lock().await = Some(tokio::spawn(async move {
             loop {
                 signal.wait_signal();
-                if *closed.lock().await {
+                if send_websocket_message(&mut write_stream, "reload")
+                    .await
+                    .is_err()
+                {
                     close.lock().await.abort();
                     break;
                 }
-                close.lock().await.abort();
-                {
-                    let mut stream = stream.lock().await;
-                    if send_websocket_message(&mut stream, "reload").await.is_err() {
-                        close.lock().await.abort();
-                        break;
-                    }
-                }
-                *close.lock().await = spawn_loop(stream.clone(), closed.clone(), sender2.clone())
             }
         }));
-        *sender.lock().await = v;
     });
     Ok(())
 }

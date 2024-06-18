@@ -74,7 +74,7 @@ pub async fn serve(path: PathBuf, port: u16, global: bool, signal: Option<Signal
             }
             Err(e) => {
                 #[cfg(feature = "log")]
-                log::error!("Error accepting connection: {:?}", e);
+                log::warn!("Error accepting connection: {:?}", e);
             }
         }
     }
