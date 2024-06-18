@@ -2,8 +2,6 @@ window.onload = () => {
   const socket = new WebSocket(`ws://${window.location.host}/ws`);
 
   socket.onmessage = (event) => {
-    console.log(event);
-
     if (event.data === "reload") {
       window.location.reload();
     }
