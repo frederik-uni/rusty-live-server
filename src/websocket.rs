@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use sha1::{Digest as _, Sha1};
@@ -148,8 +148,17 @@ pub async fn handle_websocket(
                 break;
             }
         }
-        if let Some(v) = sender_read.lock().await.as_ref() {
-            v.abort();
+        loop {
+            match sender_read.lock().await.as_ref() {
+                Some(v) => {
+                    v.abort();
+                    break;
+                }
+                None => {
+                    //TODO: is the sender_read mutex released??
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+            }
         }
     })));
     *sender.lock().await = Some(tokio::spawn(async move {
