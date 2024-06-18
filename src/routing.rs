@@ -14,7 +14,7 @@ use crate::{websocket::handle_websocket, Signal};
 
 pub async fn handle_client(mut stream: TcpStream, base_dir: PathBuf, signal: Arc<Signal>) {
     let mut buffer = [0; 512];
-    if let Ok(_) = stream.read(&mut buffer).await {
+    if stream.read(&mut buffer).await.is_ok() {
         let request = String::from_utf8_lossy(&buffer[..]);
         let mut parts = request.split_whitespace();
         let protocol = parts.next();
@@ -35,7 +35,7 @@ pub async fn handle_client(mut stream: TcpStream, base_dir: PathBuf, signal: Arc
                 }
             }
             if let Some(key) = websocket {
-                handle_websocket(stream, key, signal).await;
+                let _ = handle_websocket(stream, key, signal).await;
             } else if file_path.is_dir() {
                 if serve_directory(&file_path, &mut stream).await.is_err() {
                     serve_500(&mut stream).await;

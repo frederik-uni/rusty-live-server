@@ -125,20 +125,15 @@ fn spawn_loop(
     sender: Arc<Mutex<Option<JoinHandle<()>>>>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
-        loop {
-            match read_websocket_message(&mut *stream.lock().await).await {
-                Ok(msg) => {
-                    if matches!(msg.opcode, Opcode::Close) {
-                        break;
-                    }
-                }
-                Err(_) => {
-                    break;
-                }
+        while let Ok(msg) = read_websocket_message(&mut *stream.lock().await).await {
+            if matches!(msg.opcode, Opcode::Close) {
+                break;
             }
         }
         *closed.lock().await = true;
-        sender.lock().await.as_ref().map(|v| v.abort());
+        if let Some(v) = sender.lock().await.as_ref() {
+            v.abort();
+        }
     })
 }
 
