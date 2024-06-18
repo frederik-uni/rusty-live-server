@@ -50,7 +50,10 @@ pub async fn serve(path: PathBuf, port: u16, global: bool, signal: Option<Signal
                 s.send_signal();
             }
         }
-        Err(e) => println!("watch error: {:?}", e),
+        Err(e) => {
+            #[cfg(feature = "log")]
+            log::warn!("watch error: {:?}", e)
+        }
     })?;
 
     #[cfg(feature = "filesystem-events")]
@@ -70,7 +73,8 @@ pub async fn serve(path: PathBuf, port: u16, global: bool, signal: Option<Signal
                 });
             }
             Err(e) => {
-                eprintln!("Error accepting connection: {:?}", e);
+                #[cfg(feature = "log")]
+                log::error!("Error accepting connection: {:?}", e);
             }
         }
     }

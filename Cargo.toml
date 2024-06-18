@@ -1,6 +1,6 @@
 [package]
 name = "serve-dir"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 
 [dependencies]
@@ -9,8 +9,10 @@ sha1 = { version ="0.11.0-pre.3", default-features = false }
 tokio = { version = "1.38.0", default-features = false, features = ["sync", "rt", "net", "io-util", "fs", "macros", "rt-multi-thread"] }
 notify = { version = "6.1.1", default-features = false, features = ["macos_kqueue"], optional = true }
 clap = { version = "4.5.7", features = ["derive"], optional = true }
+log = { version ="0.4.21", optional = true }
 
 [features]
-default = ["filesystem-events"]
+default = ["filesystem-events", "log"]
 filesystem-events = ["dep:notify"]
+log = ["dep:log"]
 binary = ["dep:clap", "filesystem-events"]
