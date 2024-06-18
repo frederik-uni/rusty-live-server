@@ -1,4 +1,5 @@
 use std::{
+    io,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -36,9 +37,13 @@ pub async fn handle_client(mut stream: TcpStream, base_dir: PathBuf, signal: Arc
             if let Some(key) = websocket {
                 handle_websocket(stream, key, signal).await;
             } else if file_path.is_dir() {
-                serve_directory(&file_path, &mut stream).await;
+                if serve_directory(&file_path, &mut stream).await.is_err() {
+                    serve_500(&mut stream).await;
+                }
             } else if file_path.is_file() {
-                serve_file(&file_path, &mut stream).await;
+                if serve_file(&file_path, &mut stream).await.is_err() {
+                    serve_500(&mut stream).await;
+                }
             } else {
                 serve_404(&mut stream).await;
             }
@@ -46,32 +51,32 @@ pub async fn handle_client(mut stream: TcpStream, base_dir: PathBuf, signal: Arc
     }
 }
 
-async fn serve_directory(dir: &Path, stream: &mut TcpStream) {
+async fn serve_directory(dir: &Path, stream: &mut TcpStream) -> io::Result<()> {
     let mut response = String::new();
     response.push_str("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
     response.push_str("<html><body><ul>");
 
-    if let Ok(mut entries) = read_dir(dir).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let file_name = entry.file_name().into_string().unwrap_or_default();
-            response.push_str(&format!(
-                "<li><a href=\"{}\">{}</a></li>",
-                file_name, file_name
-            ));
-        }
+    let mut entries = read_dir(dir).await?;
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let file_name = entry.file_name().into_string().unwrap_or_default();
+        response.push_str(&format!(
+            "<li><a href=\"{}\">{}</a></li>",
+            file_name, file_name
+        ));
     }
 
     response.push_str("</ul></body></html>");
-    let _ = stream.write(response.as_bytes()).await;
+    let _ = stream.write(response.as_bytes()).await?;
+    Ok(())
 }
 
-async fn serve_file(file_path: &Path, stream: &mut TcpStream) {
+async fn serve_file(file_path: &Path, stream: &mut TcpStream) -> io::Result<()> {
+    let mut file = File::open(file_path).await?;
     let is_html = file_path
         .as_os_str()
         .to_str()
         .unwrap_or_default()
         .ends_with(".html");
-    let mut file = File::open(file_path).await.unwrap();
     let mut contents = Vec::new();
     if is_html {
         contents.append(
@@ -80,7 +85,7 @@ async fn serve_file(file_path: &Path, stream: &mut TcpStream) {
                 .to_vec(),
         )
     }
-    let _ = file.read_to_end(&mut contents).await;
+    let _ = file.read_to_end(&mut contents).await?;
 
     let response = format!(
         "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
@@ -88,9 +93,15 @@ async fn serve_file(file_path: &Path, stream: &mut TcpStream) {
     );
     let _ = stream.write(response.as_bytes()).await;
     let _ = stream.write(&contents).await;
+    Ok(())
 }
 
 async fn serve_404(stream: &mut TcpStream) {
     let response = "HTTP/1.1 404 NOT FOUND\r\n\r\n";
     let _ = stream.write(response.as_bytes()).await;
+}
+
+async fn serve_500(stream: &mut TcpStream) {
+    let response = "HTTP/1.1 500 INTERNAL SERVER ERROR\r\n\r\n";
+    let _ = stream.write_all(response.as_bytes()).await;
 }

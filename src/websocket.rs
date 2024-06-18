@@ -43,7 +43,7 @@ pub enum Opcode {
     Other(u8),
 }
 
-/// CHATGPT
+/// Chatgpt
 pub async fn read_websocket_message(stream: &mut TcpStream) -> Result<WebSocketMessage, io::Error> {
     // Read the first two bytes which contain the frame header
     let mut header = [0; 2];
@@ -142,7 +142,11 @@ fn spawn_loop(
     })
 }
 
-pub async fn handle_websocket(mut stream: TcpStream, key: String, signal: Arc<Signal>) {
+pub async fn handle_websocket(
+    mut stream: TcpStream,
+    key: String,
+    signal: Arc<Signal>,
+) -> io::Result<()> {
     let response_key = generate_websocket_accept_key(&key);
     let response = format!(
         "HTTP/1.1 101 Switching Protocols\r\n\
@@ -151,9 +155,10 @@ pub async fn handle_websocket(mut stream: TcpStream, key: String, signal: Arc<Si
                     Sec-WebSocket-Accept: {}\r\n\r\n",
         response_key
     );
-    stream.write_all(response.as_bytes()).await.unwrap();
+    stream.write_all(response.as_bytes()).await?;
 
     tokio::spawn(async move {
+        //TODO: refactor
         let stream = Arc::new(Mutex::new(stream));
         let closed = Arc::new(Mutex::new(false));
         let sender = Arc::new(Mutex::new(None));
@@ -183,4 +188,5 @@ pub async fn handle_websocket(mut stream: TcpStream, key: String, signal: Arc<Si
         }));
         *sender.lock().await = v;
     });
+    Ok(())
 }
