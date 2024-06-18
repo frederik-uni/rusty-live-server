@@ -1,0 +1,14 @@
+[package]
+name = "serve-dir"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sha1 = "0.11.0-pre.3"
+base64 = "0.22.1"
+notify = { version = "6.1.1", default-features = false, features = ["macos_kqueue"], optional = true}
+tokio = {version = "1.38.0", default-features = false, features = ["sync", "rt", "net", "io-util", "fs", "macros", "rt-multi-thread"]}
+
+[features]
+default = ["filesystem-events"]
+filesystem-events = ["dep:notify"]
