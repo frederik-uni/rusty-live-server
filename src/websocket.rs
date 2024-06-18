@@ -139,32 +139,30 @@ pub async fn handle_websocket(
     );
     stream.write_all(response.as_bytes()).await?;
 
-    tokio::spawn(async move {
-        let (mut read_stream, mut write_stream) = stream.into_split();
-        let sender: Arc<Mutex<Option<JoinHandle<_>>>> = Arc::new(Mutex::new(None));
-        let sender_read = sender.clone();
-        let close = Arc::new(Mutex::new(tokio::spawn(async move {
-            while let Ok(msg) = read_websocket_message(&mut read_stream).await {
-                if matches!(msg.opcode, Opcode::Close) {
-                    break;
-                }
+    let (mut read_stream, mut write_stream) = stream.into_split();
+    let sender: Arc<Mutex<Option<JoinHandle<_>>>> = Arc::new(Mutex::new(None));
+    let sender_read = sender.clone();
+    let close = Arc::new(Mutex::new(tokio::spawn(async move {
+        while let Ok(msg) = read_websocket_message(&mut read_stream).await {
+            if matches!(msg.opcode, Opcode::Close) {
+                break;
             }
-            if let Some(v) = sender_read.lock().await.as_ref() {
-                v.abort();
+        }
+        if let Some(v) = sender_read.lock().await.as_ref() {
+            v.abort();
+        }
+    })));
+    *sender.lock().await = Some(tokio::spawn(async move {
+        loop {
+            signal.wait_signal();
+            if send_websocket_message(&mut write_stream, "reload")
+                .await
+                .is_err()
+            {
+                close.lock().await.abort();
+                break;
             }
-        })));
-        *sender.lock().await = Some(tokio::spawn(async move {
-            loop {
-                signal.wait_signal();
-                if send_websocket_message(&mut write_stream, "reload")
-                    .await
-                    .is_err()
-                {
-                    close.lock().await.abort();
-                    break;
-                }
-            }
-        }));
-    });
+        }
+    }));
     Ok(())
 }
