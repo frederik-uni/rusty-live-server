@@ -17,9 +17,21 @@ jobs:
           - name: x86_64-unknown-linux-gnu # linux-amd64
             runner: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+          - name: aarch64-unknown-linux-gnu # linux-arm64
+            runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+          - name: i686-unknown-linux-gnu # linux-amd32
+            runner: ubuntu-latest
+            target: i686-unknown-linux-gnu
+          - name: armv7-unknown-linux-gnueabihf # raspberry pi
+            runner: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
           - name: x86_64-pc-windows-msvc # win-amd64
             runner: windows-latest
             target: x86_64-pc-windows-msvc
+          - name: aarch64-pc-windows-msvc # win-arm64
+            runner: windows-latest
+            target: aarch64-pc-windows-msvc
           - name: x86_64-apple-darwin # macos-amd64
             runner: macos-latest
             target: x86_64-apple-darwin
