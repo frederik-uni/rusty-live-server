@@ -5,7 +5,7 @@ use std::{
 };
 
 use tokio::{
-    fs::{read_dir, File},
+    fs::{self, read_dir, File},
     io::{AsyncReadExt as _, AsyncWriteExt as _},
     net::TcpStream,
 };
@@ -37,6 +37,8 @@ pub async fn handle_client(mut stream: TcpStream, base_dir: PathBuf, signal: Arc
             }
             if let Some(key) = websocket {
                 let _ = handle_websocket(stream, key, signal).await;
+            } else if path == "/favicon.ico" {
+                serve_favicon(&file_path, &mut stream).await;
             } else if file_path.is_dir() {
                 if serve_directory(&file_path, &mut stream).await.is_err() {
                     serve_500(&mut stream).await;
@@ -60,6 +62,9 @@ async fn serve_directory(dir: &Path, stream: &mut TcpStream) -> io::Result<()> {
     let mut entries = read_dir(dir).await?;
     while let Ok(Some(entry)) = entries.next_entry().await {
         let file_name = entry.file_name().into_string().unwrap_or_default();
+        if file_name == "index.html" {
+            return serve_file(&dir.join("index.html"), stream).await;
+        }
         response.push_str(&format!(
             "<li><a href=\"{}\">{}</a></li>",
             file_name, file_name
@@ -104,5 +109,17 @@ async fn serve_404(stream: &mut TcpStream) {
 
 async fn serve_500(stream: &mut TcpStream) {
     let response = "HTTP/1.1 500 INTERNAL SERVER ERROR\r\n\r\n";
-    let _ = stream.write_all(response.as_bytes()).await;
+    let _ = stream.write(response.as_bytes()).await;
+}
+
+async fn serve_favicon(path: &Path, stream: &mut TcpStream) {
+    let bytes = fs::read(path)
+        .await
+        .unwrap_or(include_bytes!("../favicon.ico").to_vec());
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: image/x-icon\r\nContent-Length: {}\r\n\r\n",
+        bytes.len()
+    );
+    let _ = stream.write(response.as_bytes()).await;
+    let _ = stream.write(&bytes).await;
 }
