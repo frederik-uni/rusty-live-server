@@ -14,15 +14,18 @@ window.onload = () => {
         if (link.rel !== "stylesheet") continue;
         const clonedLink = link.cloneNode(true);
         if (link.href.startsWith("http://127.0.0.1:8081" + filePath)) {
-          if (link.href.includes("?")) {
-            const indexOf = link.href.indexOf("?");
-            if (link.href.slice(indexOf).contains("counter=")) {
-              //todo: increment
-            } else {
-              clonedLink.href += "&counter=1";
+          const indexOf = link.href.indexOf("?");
+          if (indexOf !== -1 && link.href.slice(indexOf).includes("counter=")) {
+            const url = new URL(link.href);
+            const params = new URLSearchParams(url.search);
+            const counter = params.get("counter");
+            if (counter) {
+              params.set("counter", Number.parseInt(counter) + 1);
             }
+            url.search = params.toString();
+            clonedLink.href = url.toString();
           } else {
-            clonedLink.href += "?counter=1";
+            clonedLink.href += `${indexOf !== -1 ? "&" : "?"}counter=1`;
           }
         }
         link.replaceWith(clonedLink);
