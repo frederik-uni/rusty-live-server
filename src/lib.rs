@@ -67,24 +67,26 @@ pub async fn serve(path: PathBuf, port: u16, global: bool, signal: Option<Signal
             ) {
                 if let Some(changed_file) = event.paths.pop() {
                     if let Ok(hash) = b3sum(&changed_file) {
-                        if let Ok(rel_path) = changed_file.strip_prefix(abs_path.clone()) {
-                            let changed = match file_table.entry(changed_file.clone()) {
-                                std::collections::hash_map::Entry::Occupied(v) => {
-                                    let mu: &mut blake3::Hash = v.into_mut();
-                                    if *mu != hash {
-                                        *mu = hash;
-                                        true
-                                    } else {
-                                        false
+                        if let Ok(changed_file) = changed_file.canonicalize() {
+                            if let Ok(rel_path) = changed_file.strip_prefix(abs_path.clone()) {
+                                let changed = match file_table.entry(changed_file.clone()) {
+                                    std::collections::hash_map::Entry::Occupied(v) => {
+                                        let mu: &mut blake3::Hash = v.into_mut();
+                                        if *mu != hash {
+                                            *mu = hash;
+                                            true
+                                        } else {
+                                            false
+                                        }
                                     }
+                                    std::collections::hash_map::Entry::Vacant(v) => {
+                                        v.insert(hash);
+                                        true
+                                    }
+                                };
+                                if changed {
+                                    s.send_signal(rel_path.to_path_buf());
                                 }
-                                std::collections::hash_map::Entry::Vacant(v) => {
-                                    v.insert(hash);
-                                    true
-                                }
-                            };
-                            if changed {
-                                s.send_signal(rel_path.to_path_buf());
                             }
                         }
                     }

@@ -8,8 +8,7 @@ window.onload = () => {
   socket.onmessage = (event) => {
     if (event.data === "reload") {
       window.location.reload();
-    }
-    if (event.data.startsWith("update-css://")) {
+    } else if (event.data.startsWith("update-css://")) {
       const filePath = event.data.substring(13);
       const links = document.getElementsByTagName("link");
       for (const link of links) {
@@ -33,10 +32,6 @@ window.onload = () => {
         link.replaceWith(clonedLink);
       }
     }
-  };
-
-  socket.onopen = () => {
-    console.log("Reload WebSocket connection established");
   };
 
   socket.onerror = (error) => {

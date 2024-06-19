@@ -15,13 +15,12 @@ async fn main() {
 }
 
 fn parse_args() -> Result<(PathBuf, u16), &'static str> {
-    let mut args = env::args().skip(1);
+    let args = env::args().skip(1);
     let mut path = vec![];
     let mut port: u16 = 8080;
     let mut next_port = false;
-
-    while let Some(arg) = args.next() {
-        if let Some(arg) = arg.strip_prefix("-") {
+    for arg in args {
+        if let Some(arg) = arg.strip_prefix('-') {
             if next_port {
                 return Err("error: a value is required for '--port <PORT>' but none was supplied");
             }
