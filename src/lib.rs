@@ -1,3 +1,5 @@
+#![allow(async_fn_in_trait)]
+mod fs;
 mod routing;
 mod signal;
 mod websocket;
@@ -14,6 +16,9 @@ use routing::handle_client;
 pub use signal::Signal;
 use tokio::{io, net::TcpListener};
 
+pub use fs::AsyncFileSystem;
+pub use fs::Dir;
+pub use fs::FileSystemInterface;
 #[cfg(feature = "filesystem-events")]
 use notify::event::{CreateKind, ModifyKind};
 #[cfg(feature = "filesystem-events")]
@@ -47,7 +52,13 @@ fn b3sum(path: &Path) -> io::Result<blake3::Hash> {
     Ok(blake3::hash(&bytes))
 }
 
-pub async fn serve(path: PathBuf, port: u16, global: bool, signal: Option<Signal>) -> Result<()> {
+pub async fn serve<T: FileSystemInterface + 'static>(
+    path: PathBuf,
+    port: u16,
+    global: bool,
+    signal: Option<Signal>,
+    fs: T,
+) -> Result<()> {
     let signal = Arc::new(signal.unwrap_or_default());
     #[cfg(feature = "filesystem-events")]
     let s = signal.clone();
@@ -111,8 +122,9 @@ pub async fn serve(path: PathBuf, port: u16, global: bool, signal: Option<Signal
             Ok((stream, _)) => {
                 let path = path.clone();
                 let signal = signal.clone();
+                let fs = fs.clone();
                 tokio::spawn(async move {
-                    handle_client(stream, path, signal).await;
+                    handle_client(stream, path, signal, fs).await;
                 });
             }
             Err(_e) => {

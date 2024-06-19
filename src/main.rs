@@ -1,13 +1,18 @@
 use std::{env, path::PathBuf};
 
+use rusty_live_server::AsyncFileSystem;
+
 const HELP: &str = "Usage: rusty-live-server PATH [OPTIONS]\n\nOptions:\n  -p, --port <PORT>  [default: 8080]\n  -h, --help         Print help\n  -V, --version      Print version";
 
 #[tokio::main]
 async fn main() {
     match parse_args() {
-        Ok((path, port)) => rusty_live_server::serve(path, port, true, None)
-            .await
-            .unwrap(),
+        Ok((path, port)) => {
+            let afs = AsyncFileSystem::default();
+            rusty_live_server::serve(path, port, true, None, afs)
+                .await
+                .unwrap()
+        }
         Err(msg) => {
             println!("{msg}")
         }
