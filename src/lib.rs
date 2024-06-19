@@ -93,9 +93,9 @@ pub async fn serve(path: PathBuf, port: u16, global: bool, signal: Option<Signal
                 }
             }
         }
-        Err(e) => {
+        Err(_e) => {
             #[cfg(feature = "log")]
-            log::warn!("watch error: {:?}", e)
+            log::warn!("watch error: {:?}", _e)
         }
     })?;
 
@@ -115,9 +115,9 @@ pub async fn serve(path: PathBuf, port: u16, global: bool, signal: Option<Signal
                     handle_client(stream, path, signal).await;
                 });
             }
-            Err(e) => {
+            Err(_e) => {
                 #[cfg(feature = "log")]
-                log::warn!("Error accepting connection: {:?}", e);
+                log::warn!("Error accepting connection: {:?}", _e);
             }
         }
     }
