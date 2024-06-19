@@ -1,5 +1,5 @@
 [package]
-name = "serve-dir"
+name = "rusty-live-server"
 version = "0.4.0"
 edition = "2021"
 
@@ -13,7 +13,6 @@ clap = { version = "4.5.7", features = ["derive"], optional = true }
 log = { version ="0.4.21", optional = true }
 
 [features]
-default = ["filesystem-events", "log", "binary"]
+default = ["filesystem-events", "log"]
 filesystem-events = ["dep:notify", "dep:blake3"]
 log = ["dep:log"]
-binary = ["dep:clap", "filesystem-events"]
