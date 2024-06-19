@@ -21,6 +21,7 @@ pub async fn handle_client(mut stream: TcpStream, base_dir: PathBuf, signal: Arc
         if let (Some("GET"), Some(path), Some(_)) = (protocol, parts.next(), parts.next()) {
             let mut file_path = base_dir.to_path_buf();
             let mut websocket = None;
+            let path = path.split_once('?').map(|v| v.0).unwrap_or(path);
             if path != "/" {
                 file_path.push(&path[1..]);
             }

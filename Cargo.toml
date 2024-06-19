@@ -12,7 +12,7 @@ clap = { version = "4.5.7", features = ["derive"], optional = true }
 log = { version ="0.4.21", optional = true }
 
 [features]
-default = ["filesystem-events", "log"]
+default = ["filesystem-events", "log", "binary"]
 filesystem-events = ["dep:notify"]
 log = ["dep:log"]
 binary = ["dep:clap", "filesystem-events"]

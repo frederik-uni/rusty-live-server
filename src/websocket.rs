@@ -163,11 +163,23 @@ pub async fn handle_websocket(
     })));
     *sender.lock().await = Some(tokio::spawn(async move {
         loop {
-            signal.wait_signal();
-            if send_websocket_message(&mut write_stream, "reload")
+            let file_path = signal.wait_signal().await;
+            let css = file_path
+                .as_os_str()
+                .to_str()
+                .unwrap_or_default()
+                .trim()
+                .ends_with(".css");
+            let msg = if css {
+                send_websocket_message(
+                    &mut write_stream,
+                    &format!("update-css:///{}", file_path.display()),
+                )
                 .await
-                .is_err()
-            {
+            } else {
+                send_websocket_message(&mut write_stream, "reload").await
+            };
+            if msg.is_err() {
                 close.lock().await.abort();
                 break;
             }

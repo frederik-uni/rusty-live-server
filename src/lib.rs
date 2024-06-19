@@ -38,8 +38,10 @@ pub async fn serve(path: PathBuf, port: u16, global: bool, signal: Option<Signal
     #[cfg(feature = "filesystem-events")]
     let s = signal.clone();
     #[cfg(feature = "filesystem-events")]
+    let abs_path = std::fs::canonicalize(&path)?;
+    #[cfg(feature = "filesystem-events")]
     let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| match res {
-        Ok(event) => {
+        Ok(mut event) => {
             let kind = event.kind;
             if matches!(
                 kind,
@@ -47,7 +49,11 @@ pub async fn serve(path: PathBuf, port: u16, global: bool, signal: Option<Signal
                     | EventKind::Modify(ModifyKind::Name(_))
                     | EventKind::Modify(ModifyKind::Data(_))
             ) {
-                s.send_signal();
+                if let Some(changed_file) = event.paths.pop() {
+                    if let Ok(rel_path) = changed_file.strip_prefix(abs_path.clone()) {
+                        s.send_signal(rel_path.to_path_buf());
+                    }
+                }
             }
         }
         Err(e) => {

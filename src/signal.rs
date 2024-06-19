@@ -1,8 +1,10 @@
-use std::sync::{Condvar, Mutex};
+use std::path::PathBuf;
+
+use tokio::sync::broadcast::{channel, Receiver, Sender};
 
 pub struct Signal {
-    condvar: Condvar,
-    mutex: Mutex<bool>,
+    tx: Sender<PathBuf>,
+    rx: Receiver<PathBuf>,
 }
 
 impl Default for Signal {
@@ -13,23 +15,15 @@ impl Default for Signal {
 
 impl Signal {
     fn new() -> Self {
-        Signal {
-            condvar: Condvar::new(),
-            mutex: Mutex::new(false),
-        }
+        let (tx, rx) = channel(100);
+        Signal { tx, rx }
     }
 
-    pub fn send_signal(&self) {
-        let mut signal_sent = self.mutex.lock().unwrap();
-        *signal_sent = true;
-        self.condvar.notify_all();
+    pub fn send_signal(&self, file: PathBuf) {
+        let _ = self.tx.send(file).unwrap();
     }
 
-    pub(crate) fn wait_signal(&self) {
-        let mut signal_sent = self.mutex.lock().unwrap();
-        while !*signal_sent {
-            signal_sent = self.condvar.wait(signal_sent).unwrap();
-        }
-        *signal_sent = false;
+    pub(crate) async fn wait_signal(&self) -> PathBuf {
+        self.rx.resubscribe().recv().await.unwrap()
     }
 }
