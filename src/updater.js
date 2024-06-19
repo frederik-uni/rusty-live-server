@@ -1,3 +1,7 @@
+function getAbsoluteUrl(url) {
+  return new URL(url, window.location).href;
+}
+
 window.onload = () => {
   const socket = new WebSocket(`ws://${window.location.host}/ws`);
 
@@ -7,13 +11,11 @@ window.onload = () => {
     }
     if (event.data.startsWith("update-css://")) {
       const filePath = event.data.substring(13);
-      console.log(filePath);
-
       const links = document.getElementsByTagName("link");
       for (const link of links) {
         if (link.rel !== "stylesheet") continue;
         const clonedLink = link.cloneNode(true);
-        if (link.href.startsWith("http://127.0.0.1:8081" + filePath)) {
+        if (getAbsoluteUrl(link.href).startsWith(getAbsoluteUrl(filePath))) {
           const indexOf = link.href.indexOf("?");
           if (indexOf !== -1 && link.href.slice(indexOf).includes("counter=")) {
             const url = new URL(link.href);
