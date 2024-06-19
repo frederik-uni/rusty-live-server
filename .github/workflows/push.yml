@@ -2,7 +2,7 @@ name: Build
 on: [push]
 env:
   # The project name specified in your Cargo.toml
-  PROJECT_NAME: rust-update
+  PROJECT_NAME: rusty-live-server
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   REPO: ${{ github.repository }}
 jobs:
