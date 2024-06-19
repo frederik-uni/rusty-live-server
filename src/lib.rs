@@ -1,4 +1,3 @@
-#![allow(async_fn_in_trait)]
 mod fs;
 mod routing;
 mod signal;

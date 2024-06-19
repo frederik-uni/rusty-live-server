@@ -3,7 +3,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use tokio::fs::{read_dir, File as TokioFile, ReadDir};
+use tokio::{
+    fs::{read_dir, File as TokioFile, ReadDir},
+    io::AsyncReadExt as _,
+};
 
 use crate::Error;
 
@@ -17,7 +20,7 @@ pub trait Dir: Send {
 }
 
 pub trait File: Send {
-    fn read_to_end(&self) -> impl Future<Output = Vec<u8>> + Send;
+    fn read_to_end(&mut self) -> impl Future<Output = Vec<u8>> + Send;
 }
 
 #[derive(Default, Clone, Copy)]
@@ -39,8 +42,10 @@ impl AsyncFile {
 }
 
 impl File for AsyncFile {
-    async fn read_to_end(&self) -> Vec<u8> {
-        vec![]
+    async fn read_to_end(&mut self) -> Vec<u8> {
+        let mut buffer = vec![];
+        self.file.read_to_end(&mut buffer).await;
+        buffer
     }
 }
 

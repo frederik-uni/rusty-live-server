@@ -134,7 +134,7 @@ async fn serve_500(stream: &mut TcpStream) {
 
 async fn serve_favicon(path: &Path, stream: &mut TcpStream, fs: impl FileSystemInterface) {
     let bytes = match fs.get_file(path).await {
-        Ok(v) => v.read_to_end().await,
+        Ok(mut v) => v.read_to_end().await,
         Err(_) => include_bytes!("../favicon.ico").to_vec(),
     };
     let response = format!(
