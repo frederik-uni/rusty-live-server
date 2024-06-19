@@ -2,6 +2,12 @@ mod routing;
 mod signal;
 mod websocket;
 
+#[cfg(feature = "filesystem-events")]
+use std::collections::HashMap;
+#[cfg(feature = "filesystem-events")]
+use std::io::Read;
+#[cfg(feature = "filesystem-events")]
+use std::path::Path;
 use std::{path::PathBuf, sync::Arc};
 
 use routing::handle_client;
@@ -33,12 +39,22 @@ impl From<notify::Error> for Error {
     }
 }
 
+#[cfg(feature = "filesystem-events")]
+fn b3sum(path: &Path) -> io::Result<blake3::Hash> {
+    let mut file = std::fs::File::open(path)?;
+    let mut bytes = vec![];
+    file.read_to_end(&mut bytes)?;
+    Ok(blake3::hash(&bytes))
+}
+
 pub async fn serve(path: PathBuf, port: u16, global: bool, signal: Option<Signal>) -> Result<()> {
     let signal = Arc::new(signal.unwrap_or_default());
     #[cfg(feature = "filesystem-events")]
     let s = signal.clone();
     #[cfg(feature = "filesystem-events")]
     let abs_path = std::fs::canonicalize(&path)?;
+    #[cfg(feature = "filesystem-events")]
+    let mut file_table = HashMap::new();
     #[cfg(feature = "filesystem-events")]
     let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| match res {
         Ok(mut event) => {
@@ -50,8 +66,27 @@ pub async fn serve(path: PathBuf, port: u16, global: bool, signal: Option<Signal
                     | EventKind::Modify(ModifyKind::Data(_))
             ) {
                 if let Some(changed_file) = event.paths.pop() {
-                    if let Ok(rel_path) = changed_file.strip_prefix(abs_path.clone()) {
-                        s.send_signal(rel_path.to_path_buf());
+                    if let Ok(hash) = b3sum(&changed_file) {
+                        if let Ok(rel_path) = changed_file.strip_prefix(abs_path.clone()) {
+                            let changed = match file_table.entry(changed_file.clone()) {
+                                std::collections::hash_map::Entry::Occupied(v) => {
+                                    let mu: &mut blake3::Hash = v.into_mut();
+                                    if *mu != hash {
+                                        *mu = hash;
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                                std::collections::hash_map::Entry::Vacant(v) => {
+                                    v.insert(hash);
+                                    true
+                                }
+                            };
+                            if changed {
+                                s.send_signal(rel_path.to_path_buf());
+                            }
+                        }
                     }
                 }
             }
