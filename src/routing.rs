@@ -102,16 +102,14 @@ async fn serve_file(
         .to_str()
         .unwrap_or_default()
         .ends_with(".html");
-    let mut contents = Vec::new();
+    let mut contents = fs.get_file(file_path).await?.read_to_end().await;
     if is_html {
         contents.append(
-            &mut format!("<script>{}</script>", include_str!("updater.js"))
+            &mut format!("<script defer>{}</script>", include_str!("updater.js"))
                 .as_bytes()
                 .to_vec(),
         )
     }
-
-    contents.append(&mut fs.get_file(file_path).await?.read_to_end().await);
 
     let response = format!(
         "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
