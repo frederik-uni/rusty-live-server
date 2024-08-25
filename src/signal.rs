@@ -13,6 +13,15 @@ impl Default for Signal {
     }
 }
 
+impl Clone for Signal {
+    fn clone(&self) -> Self {
+        Self {
+            rx: self.tx.subscribe(),
+            tx: self.tx.clone(),
+        }
+    }
+}
+
 impl Signal {
     fn new() -> Self {
         let (tx, rx) = channel(100);
