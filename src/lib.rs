@@ -17,6 +17,7 @@ use tokio::{io, net::TcpListener};
 
 pub use fs::AsyncFileSystem;
 pub use fs::Dir;
+pub use fs::File;
 pub use fs::FileSystemInterface;
 #[cfg(feature = "filesystem-events")]
 use notify::event::{CreateKind, ModifyKind};
