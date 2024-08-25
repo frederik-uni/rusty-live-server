@@ -21,7 +21,8 @@ pub async fn handle_client(
         let request = String::from_utf8_lossy(&buffer[..]);
         let mut parts = request.split_whitespace();
         let protocol = parts.next();
-        if let (Some("GET"), Some(path), Some(_)) = (protocol, parts.next(), parts.next()) {
+        let temp = (protocol, parts.next(), parts.next());
+        if let (Some("GET"), Some(path), Some(_)) = temp {
             let mut file_path = base_dir.to_path_buf();
             let mut websocket = None;
             let path = path.split_once('?').map(|v| v.0).unwrap_or(path);
@@ -53,6 +54,10 @@ pub async fn handle_client(
             } else {
                 serve_404(&mut stream).await;
             }
+        } else if let (Some("POST"), Some("/ping"), Some(_)) = temp {
+            let contents = "pong";
+            let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text\r\n\r\n{}", contents);
+            let _ = stream.write(response.as_bytes()).await;
         }
     }
 }
