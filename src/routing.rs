@@ -4,7 +4,7 @@ use std::{
 };
 
 use tokio::{
-    io::{AsyncReadExt as _, AsyncWriteExt as _},
+    io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader},
     net::TcpStream,
 };
 
@@ -16,13 +16,34 @@ pub async fn handle_client(
     signal: Arc<Signal>,
     fs: impl FileSystemInterface,
 ) {
-    let mut buffer = [0; 512];
-    if stream.read(&mut buffer).await.is_ok() {
-        let request = String::from_utf8_lossy(&buffer[..]);
-        let mut parts = request.split_whitespace();
-        let protocol = parts.next();
-        let temp = (protocol, parts.next(), parts.next());
-        if let (Some("GET"), Some(path), Some(_)) = temp {
+    let mut reader = BufReader::new(&mut stream);
+    let mut request = String::new();
+    let mut line = String::new();
+
+    loop {
+        let bytes_read = reader.read_line(&mut line).await;
+        line.clear();
+        let bytes_read = match bytes_read {
+            Ok(v) => v,
+            Err(_) => {
+                return;
+            }
+        };
+        if bytes_read == 0 {
+            return;
+        }
+
+        request.push_str(&line);
+        if request.contains("\r\n\r\n") {
+            break;
+        }
+    }
+    let mut parts = request.split_whitespace();
+    let protocol = parts.next();
+    let temp = (protocol, parts.next(), parts.next());
+    if let (Some(method), Some(path), Some(_)) = temp {
+        if matches!(method, "GET" | "HEAD") {
+            let head = method == "HEAD";
             let mut file_path = base_dir.to_path_buf();
             let mut websocket = None;
             let path = path.split_once('?').map(|v| v.0).unwrap_or(path);
@@ -42,23 +63,26 @@ pub async fn handle_client(
             if let Some(key) = websocket {
                 let _ = handle_websocket(stream, key, signal).await;
             } else if path == "/favicon.ico" {
-                serve_favicon(&file_path, &mut stream, fs).await;
+                serve_favicon(&file_path, &mut stream, fs, head).await;
             } else if file_path.is_dir() {
-                if serve_directory(&file_path, &mut stream, fs).await.is_err() {
+                if serve_directory(&file_path, &mut stream, fs, head)
+                    .await
+                    .is_err()
+                {
                     serve_500(&mut stream).await;
                 }
             } else if file_path.is_file() {
-                if serve_file(&file_path, &mut stream, fs).await.is_err() {
+                if serve_file(&file_path, &mut stream, fs, head).await.is_err() {
                     serve_500(&mut stream).await;
                 }
             } else {
                 serve_404(&mut stream).await;
             }
-        } else if let (Some("POST"), Some("/ping"), Some(_)) = temp {
-            let contents = "pong";
-            let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text\r\n\r\n{}", contents);
-            let _ = stream.write(response.as_bytes()).await;
         }
+    } else if let (Some("POST"), Some("/ping"), Some(_)) = temp {
+        let contents = "pong";
+        let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text\r\n\r\n{}", contents);
+        let _ = stream.write(response.as_bytes()).await;
     }
 }
 
@@ -66,9 +90,14 @@ async fn serve_directory(
     dir: &Path,
     stream: &mut TcpStream,
     fs: impl FileSystemInterface,
+    head: bool,
 ) -> crate::Result<()> {
     let mut response = String::new();
-    response.push_str("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
+    response.push_str("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n");
+    if head {
+        let _ = stream.write(response.as_bytes()).await?;
+        return Ok(());
+    }
     response.push_str("<html><body><ul>");
     let mut entries = fs.get_dir(dir).await?;
     let mut found_index = None;
@@ -89,7 +118,7 @@ async fn serve_directory(
 
     drop(entries);
     if let Some(found) = found_index {
-        return Ok(serve_file(&found, stream, fs).await?);
+        return Ok(serve_file(&found, stream, fs, head).await?);
     }
 
     response.push_str("</ul></body></html>");
@@ -101,6 +130,7 @@ async fn serve_file(
     file_path: &Path,
     stream: &mut TcpStream,
     fs: impl FileSystemInterface,
+    head: bool,
 ) -> crate::Result<()> {
     let is_html = file_path
         .as_os_str()
@@ -119,11 +149,14 @@ async fn serve_file(
     }
 
     let response = format!(
-        "HTTP/1.1 200 OK\r\nnContent-Type: {}\r\nContent-Length: {}\r\n\r\n",
+        "HTTP/1.1 200 OK\r\nnContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         mime,
         contents.len()
     );
     let _ = stream.write(response.as_bytes()).await;
+    if head {
+        return Ok(());
+    }
     let _ = stream.write(&contents).await;
     Ok(())
 }
@@ -138,15 +171,23 @@ async fn serve_500(stream: &mut TcpStream) {
     let _ = stream.write(response.as_bytes()).await;
 }
 
-async fn serve_favicon(path: &Path, stream: &mut TcpStream, fs: impl FileSystemInterface) {
+async fn serve_favicon(
+    path: &Path,
+    stream: &mut TcpStream,
+    fs: impl FileSystemInterface,
+    head: bool,
+) {
     let bytes = match fs.get_file(path).await {
         Ok(mut v) => v.read_to_end().await,
         Err(_) => include_bytes!("../favicon.ico").to_vec(),
     };
     let response = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: image/x-icon\r\nContent-Length: {}\r\n\r\n",
+        "HTTP/1.1 200 OK\r\nContent-Type: image/x-icon\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         bytes.len()
     );
     let _ = stream.write(response.as_bytes()).await;
+    if head {
+        return;
+    }
     let _ = stream.write(&bytes).await;
 }

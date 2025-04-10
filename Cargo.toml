@@ -1,15 +1,26 @@
 [package]
 name = "rusty-live-server"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 
 [dependencies]
 base64 = "0.22.1"
 sha1 = { version = "0.11.0-pre.3", default-features = false }
-tokio = { version = "1.44.2", default-features = false, features = ["sync", "rt", "net", "io-util", "fs", "time", "macros", "rt-multi-thread"] }
-notify = { version = "8.0.0", default-features = false, features = ["macos_kqueue"], optional = true }
+tokio = { version = "1.44.2", default-features = false, features = [
+    "sync",
+    "rt",
+    "net",
+    "io-util",
+    "fs",
+    "time",
+    "macros",
+    "rt-multi-thread",
+] }
+notify = { version = "8.0.0", default-features = false, features = [
+    "macos_kqueue",
+], optional = true }
 blake3 = { version = "1.8.1", optional = true }
-log = { version ="0.4.27", optional = true }
+log = { version = "0.4.27", optional = true }
 mime_guess = "2.0.5"
 
 [features]
