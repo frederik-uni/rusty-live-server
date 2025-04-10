@@ -107,6 +107,8 @@ async fn serve_file(
         .to_str()
         .unwrap_or_default()
         .ends_with(".html");
+    let mime = mime_guess::from_path(file_path).first_or_octet_stream();
+
     let mut contents = fs.get_file(file_path).await?.read_to_end().await;
     if is_html {
         contents.append(
@@ -117,7 +119,8 @@ async fn serve_file(
     }
 
     let response = format!(
-        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
+        "HTTP/1.1 200 OK\r\nnContent-Type: {}\r\nContent-Length: {}\r\n\r\n",
+        mime,
         contents.len()
     );
     let _ = stream.write(response.as_bytes()).await;
