@@ -26,11 +26,11 @@ pub async fn handle_client(
         let bytes_read = match bytes_read {
             Ok(v) => v,
             Err(_) => {
-                return;
+                break;
             }
         };
         if bytes_read == 0 {
-            return;
+            break;
         }
 
         request.push_str(&line);
