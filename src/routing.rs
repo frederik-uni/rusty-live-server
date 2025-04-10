@@ -22,7 +22,6 @@ pub async fn handle_client(
 
     loop {
         let bytes_read = reader.read_line(&mut line).await;
-        line.clear();
         let bytes_read = match bytes_read {
             Ok(v) => v,
             Err(_) => {
@@ -34,6 +33,7 @@ pub async fn handle_client(
         }
 
         request.push_str(&line);
+        line.clear();
         if request.contains("\r\n\r\n") {
             break;
         }
