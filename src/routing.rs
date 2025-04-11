@@ -149,7 +149,7 @@ async fn serve_file(
     }
 
     let response = format!(
-        "HTTP/1.1 200 OK\r\nnContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         mime,
         contents.len()
     );
